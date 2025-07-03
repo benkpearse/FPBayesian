@@ -5,11 +5,16 @@ import matplotlib.pyplot as plt
 
 # --- Sidebar Inputs ---
 st.sidebar.header("Test Parameters")
-p_A = st.sidebar.slider("Baseline conversion rate (p_A)", 0.001, 0.20, 0.05, step=0.001)
-thresh = st.sidebar.slider("Posterior threshold (e.g., 0.95)", 0.5, 0.99, 0.95, step=0.01)
-simulations = st.sidebar.slider("Simulations", 100, 2000, 500, step=100)
-samples = st.sidebar.slider("Posterior samples", 1000, 10000, 2000, step=500)
-n = st.sidebar.slider("Sample size per variant", 500, 200000, 10000, step=500)
+p_A = st.sidebar.slider("Baseline conversion rate (p_A)", 0.001, 0.20, 0.05, step=0.001,
+                         help="Conversion rate for your control variant (A), e.g., 5% means 0.05")
+thresh = st.sidebar.slider("Posterior threshold (e.g., 0.95)", 0.5, 0.99, 0.95, step=0.01,
+                           help="Confidence level to declare a winner — usually 0.95 or 0.99")
+simulations = st.sidebar.slider("Simulations", 100, 2000, 500, step=100,
+                                help="How many full A/B simulations to run — more is slower but more accurate")
+samples = st.sidebar.slider("Posterior samples", 1000, 10000, 3500, step=500,
+                            help="Number of random samples from the posterior Beta distributions")
+n = st.sidebar.slider("Sample size per variant", 500, 200000, 35000, step=500,
+                      help="Number of users (or sessions) tested in each variant arm")
 
 # --- Simulation Function for False Positive ---
 def simulate_false_positive(p_A, threshold, simulations, samples, n):
