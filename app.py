@@ -9,7 +9,7 @@ p_A = st.sidebar.slider("Baseline conversion rate (p_A)", 0.001, 0.20, 0.05, ste
 thresh = st.sidebar.slider("Posterior threshold (e.g., 0.95)", 0.5, 0.99, 0.95, step=0.01)
 simulations = st.sidebar.slider("Simulations", 100, 2000, 500, step=100)
 samples = st.sidebar.slider("Posterior samples", 1000, 10000, 2000, step=500)
-n = st.sidebar.slider("Sample size per variant", 500, 50000, 10000, step=500)
+n = st.sidebar.slider("Sample size per variant", 500, 200000, 10000, step=500)
 
 # --- Simulation Function for False Positive ---
 def simulate_false_positive(p_A, threshold, simulations, samples, n):
