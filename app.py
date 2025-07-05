@@ -4,7 +4,7 @@ from scipy.stats import beta
 import matplotlib.pyplot as plt
 
 # Set seed for reproducibility
-np.random.seed(42)
+rng = np.random.default_rng(42)
 
 # --- Sidebar Inputs ---
 st.sidebar.header("Test Parameters")
@@ -25,14 +25,14 @@ def simulate_false_positive(p_A, threshold, simulations, samples, n):
     false_positives = 0
 
     for _ in range(simulations):
-        conv_A = np.random.binomial(n, p_A)
-        conv_B = np.random.binomial(n, p_A)  # No true uplift
+        conv_A = rng.binomial(n, p_A)
+        conv_B = rng.binomial(n, p_A)  # No true uplift
 
         post_A = beta(alpha_prior + conv_A, beta_prior + n - conv_A)
         post_B = beta(alpha_prior + conv_B, beta_prior + n - conv_B)
 
-        samples_A = post_A.rvs(samples, random_state=42)
-        samples_B = post_B.rvs(samples, random_state=42)
+        samples_A = post_A.rvs(samples, random_state=rng)
+        samples_B = post_B.rvs(samples, random_state=rng)
 
         if np.mean(samples_B > samples_A) > threshold:
             false_positives += 1
