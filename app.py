@@ -11,9 +11,9 @@ st.sidebar.header("Test Parameters")
 p_A = st.sidebar.number_input("Baseline conversion rate (p_A)", min_value=0.001, max_value=0.99, value=0.05, step=0.001, format="%.3f", help="Conversion rate for your control variant (A), e.g., 5% means 0.05")
 thresh = st.sidebar.slider("Posterior threshold (e.g., 0.95)", 0.5, 0.99, 0.95, step=0.01,
                            help="Confidence level to declare a winner — usually 0.95 or 0.99")
-simulations = st.sidebar.slider("Simulations", 100, 2000, 500, step=100,
+simulations = st.sidebar.slider("Simulations", 100, 20000, 500, step=100,
                                 help="How many full A/B simulations to run — more is slower but more accurate")
-samples = st.sidebar.slider("Posterior samples", 1000, 10000, 3500, step=500,
+samples = st.sidebar.slider("Posterior samples", 1000, 100000, 3500, step=500,
                             help="Number of random samples from the posterior Beta distributions")
 n = st.sidebar.number_input("Sample size per variant", min_value=100, value=35000, step=100,
                             help="Number of users (or sessions) tested in each variant arm")
