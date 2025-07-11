@@ -8,24 +8,34 @@ rng = np.random.default_rng(42)
 
 # --- Sidebar Inputs ---
 st.sidebar.header("Test Parameters")
-p_A = st.sidebar.number_input("Baseline conversion rate (p_A)", min_value=0.001, max_value=0.99, value=0.05, step=0.001, format="%.3f", help="Conversion rate for your control variant (A), e.g., 5% means 0.05")
-thresh = st.sidebar.slider("Posterior threshold (e.g., 0.95)", 0.5, 0.99, 0.95, step=0.01,
-                           help="Confidence level to declare a winner — usually 0.95 or 0.99")
-simulations = st.sidebar.slider("Simulations", 100, 20000, 500, step=100,
-                                help="How many full A/B simulations to run — more is slower but more accurate")
-samples = st.sidebar.slider("Posterior samples", 1000, 100000, 3500, step=500,
-                            help="Number of random samples from the posterior Beta distributions")
-n = st.sidebar.number_input("Sample size per variant", min_value=100, value=35000, step=100,
-                            help="Number of users (or sessions) tested in each variant arm")
+p_A = st.sidebar.number_input("Baseline conversion rate (p_A)", min_value=0.001, max_value=0.99, value=0.05, step=0.001, format="%.3f")
+thresh = st.sidebar.slider("Posterior threshold (e.g., 0.95)", 0.5, 0.99, 0.95, step=0.01)
+simulations = st.sidebar.slider("Simulations", 100, 20000, 500, step=100)
+samples = st.sidebar.slider("Posterior samples", 1000, 100000, 3500, step=500)
 
-# --- Simulation Function for False Positive ---
-def simulate_false_positive(p_A, threshold, simulations, samples, n):
-    alpha_prior, beta_prior = 1, 1
+# --- Prior Inputs ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔄 Prior Settings")
+alpha_prior = st.sidebar.number_input("Alpha (prior successes)", min_value=0.1, value=1.0, step=0.1)
+beta_prior = st.sidebar.number_input("Beta (prior failures)", min_value=0.1, value=1.0, step=0.1)
+
+# --- Sample Size Controls ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("📉 Sample Size Settings")
+plot_range = st.sidebar.checkbox("Plot FPR vs. sample size?")
+if plot_range:
+    min_n = st.sidebar.number_input("Min sample size", 100, 100000, 5000, step=100)
+    max_n = st.sidebar.number_input("Max sample size", min_n + 100, 200000, 50000, step=100)
+    step_n = st.sidebar.number_input("Step size", 100, 20000, 5000, step=100)
+else:
+    n = st.sidebar.number_input("Sample size per variant", min_value=100, value=35000, step=100)
+
+# --- Simulation Function ---
+def simulate_false_positive(p_A, threshold, simulations, samples, n, alpha_prior, beta_prior):
     false_positives = 0
-
     for _ in range(simulations):
         conv_A = rng.binomial(n, p_A)
-        conv_B = rng.binomial(n, p_A)  # No true uplift
+        conv_B = rng.binomial(n, p_A)
 
         post_A = beta(alpha_prior + conv_A, beta_prior + n - conv_A)
         post_B = beta(alpha_prior + conv_B, beta_prior + n - conv_B)
@@ -38,31 +48,70 @@ def simulate_false_positive(p_A, threshold, simulations, samples, n):
 
     return false_positives / simulations
 
-# --- Run Simulation ---
-fp_rate = simulate_false_positive(p_A, thresh, simulations, samples, n)
-
-# --- Output ---
-st.title("Bayesian False Positive Rate Estimator")
-
+# --- Main Title and Info ---
+st.title("🧪 Bayesian False Positive Rate Estimator")
 st.markdown("""
-This app estimates the **false positive rate** of a Bayesian A/B test given:
-- No true difference between variants (A = B)
-- A posterior decision threshold (e.g., P(B > A) > 0.95)
-
-You can adjust all parameters in the sidebar.
+Estimate how often a Bayesian A/B test might **falsely declare a winner** (B > A) when there's **no true difference**.
 """)
 
-st.write(f"**Baseline Conversion Rate:** {p_A:.2%}")
-st.write(f"**Posterior Threshold:** {thresh:.2f}")
-st.write(f"**Sample Size per Variant:** {n}")
-st.write(f"**Estimated False Positive Rate:** {fp_rate:.2%}")
+# --- Run Simulation ---
+if plot_range:
+    st.subheader("📉 False Positive Rate vs. Sample Size")
+    fpr_results = []
+    sizes = list(range(min_n, max_n + 1, step_n))
+    for curr_n in sizes:
+        fpr = simulate_false_positive(p_A, thresh, simulations, samples, curr_n, alpha_prior, beta_prior)
+        fpr_results.append(fpr)
 
-# --- Visual Aid ---
-fig, ax = plt.subplots(figsize=(6, 3))
-ax.bar(["False Positive Rate"], [fp_rate], color='salmon')
-ax.axhline(0.05, color='red', linestyle='--', label='5% Threshold')
-ax.set_ylim(0, max(fp_rate + 0.02, 0.1))
-ax.set_ylabel("Rate")
-ax.set_title("Estimated False Positive Rate")
-ax.legend()
-st.pyplot(fig)
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(sizes, fpr_results, marker='o')
+    ax.axhline(0.05, color='red', linestyle='--', label='5% Benchmark')
+    ax.set_xlabel("Sample Size per Variant")
+    ax.set_ylabel("False Positive Rate")
+    ax.set_title("False Positive Rate vs. Sample Size")
+    ax.legend()
+    ax.grid(True)
+    st.pyplot(fig)
+
+    st.write("**FPR values:**")
+    for size, rate in zip(sizes, fpr_results):
+        st.write(f"Sample Size {size}: False Positive Rate = {rate:.2%}")
+else:
+    st.subheader("🔍 False Positive Rate Estimate (Single Sample Size)")
+    fp_rate = simulate_false_positive(p_A, thresh, simulations, samples, n, alpha_prior, beta_prior)
+    st.write(f"**Baseline Conversion Rate:** {p_A:.2%}")
+    st.write(f"**Posterior Threshold:** {thresh:.2f}")
+    st.write(f"**Sample Size per Variant:** {n}")
+    st.write(f"**Alpha Prior:** {alpha_prior:.1f}")
+    st.write(f"**Beta Prior:** {beta_prior:.1f}")
+    st.success(f"**Estimated False Positive Rate:** {fp_rate:.2%}")
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.bar(["False Positive Rate"], [fp_rate], color='salmon')
+    ax.axhline(0.05, color='red', linestyle='--', label='5% Benchmark')
+    ax.set_ylim(0, max(fp_rate + 0.02, 0.1))
+    ax.set_ylabel("Rate")
+    ax.set_title("Estimated False Positive Rate")
+    ax.legend()
+    st.pyplot(fig)
+
+# --- Misinterpretation Note ---
+st.markdown("""
+<details>
+<summary><strong>🧠 Understanding Bayesian False Positives</strong></summary>
+
+Unlike frequentist tests, Bayesian A/B tests **do not control a fixed Type I error (α = 0.05)** by default.
+
+- The **false positive rate can vary** with:
+  - Sample size
+  - Prior beliefs (Alpha and Beta)
+  - Posterior decision threshold (e.g., 0.95)
+- It is **not guaranteed to stay below 5%**, even with a 95% posterior threshold.
+
+You should empirically test your error rate — like this app does — to understand and justify your Bayesian decision rules.
+
+</details>
+""", unsafe_allow_html=True)
+
