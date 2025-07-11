@@ -1,16 +1,17 @@
 import streamlit as st
 import numpy as np
+import pandas as pd
 from scipy.stats import beta
 import matplotlib.pyplot as plt
 
-# Set seed for reproducibility
+# Seeded RNG for reproducibility
 rng = np.random.default_rng(42)
 
 # --- Sidebar Inputs ---
 st.sidebar.header("Test Parameters")
 p_A = st.sidebar.number_input("Baseline conversion rate (p_A)", min_value=0.001, max_value=0.99, value=0.05, step=0.001, format="%.3f")
 thresh = st.sidebar.slider("Posterior threshold (e.g., 0.95)", 0.5, 0.99, 0.95, step=0.01)
-simulations = st.sidebar.slider("Simulations", 100, 20000, 500, step=100)
+simulations = st.sidebar.slider("Simulations", 100, 20000, 3000, step=100)  # Increased default for stability
 samples = st.sidebar.slider("Posterior samples", 1000, 100000, 3500, step=500)
 
 # --- Prior Inputs ---
@@ -23,6 +24,8 @@ beta_prior = st.sidebar.number_input("Beta (prior failures)", min_value=0.1, val
 st.sidebar.markdown("---")
 st.sidebar.subheader("📉 Sample Size Settings")
 plot_range = st.sidebar.checkbox("Plot FPR vs. sample size?")
+smoothing = st.sidebar.checkbox("Smooth the curve (moving average)", value=True)
+
 if plot_range:
     min_n = st.sidebar.number_input("Min sample size", 100, 100000, 5000, step=100)
     max_n = st.sidebar.number_input("Max sample size", min_n + 100, 200000, 50000, step=100)
@@ -48,38 +51,49 @@ def simulate_false_positive(p_A, threshold, simulations, samples, n, alpha_prior
 
     return false_positives / simulations
 
-# --- Main Title and Info ---
+# --- Main Title ---
 st.title("🧪 Bayesian False Positive Rate Estimator")
+
 st.markdown("""
 Estimate how often a Bayesian A/B test might **falsely declare a winner** (B > A) when there's **no true difference**.
 """)
 
-# --- Run Simulation ---
+# --- Simulation Logic ---
 if plot_range:
     st.subheader("📉 False Positive Rate vs. Sample Size")
     fpr_results = []
     sizes = list(range(min_n, max_n + 1, step_n))
-    for curr_n in sizes:
-        fpr = simulate_false_positive(p_A, thresh, simulations, samples, curr_n, alpha_prior, beta_prior)
-        fpr_results.append(fpr)
 
-    # Plot
+    with st.spinner("Running simulations..."):
+        for curr_n in sizes:
+            fpr = simulate_false_positive(p_A, thresh, simulations, samples, curr_n, alpha_prior, beta_prior)
+            fpr_results.append(fpr)
+
+    # Optional smoothing
+    if smoothing:
+        fpr_plot = pd.Series(fpr_results).rolling(window=3, min_periods=1, center=True).mean()
+    else:
+        fpr_plot = fpr_results
+
+    # Plotting
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(sizes, fpr_results, marker='o')
+    ax.plot(sizes, fpr_plot, marker='o')
     ax.axhline(0.05, color='red', linestyle='--', label='5% Benchmark')
     ax.set_xlabel("Sample Size per Variant")
     ax.set_ylabel("False Positive Rate")
     ax.set_title("False Positive Rate vs. Sample Size")
-    ax.legend()
     ax.grid(True)
+    ax.legend()
     st.pyplot(fig)
 
-    st.write("**FPR values:**")
+    st.markdown("### FPR values:")
     for size, rate in zip(sizes, fpr_results):
         st.write(f"Sample Size {size}: False Positive Rate = {rate:.2%}")
+
 else:
     st.subheader("🔍 False Positive Rate Estimate (Single Sample Size)")
     fp_rate = simulate_false_positive(p_A, thresh, simulations, samples, n, alpha_prior, beta_prior)
+
     st.write(f"**Baseline Conversion Rate:** {p_A:.2%}")
     st.write(f"**Posterior Threshold:** {thresh:.2f}")
     st.write(f"**Sample Size per Variant:** {n}")
@@ -97,7 +111,7 @@ else:
     ax.legend()
     st.pyplot(fig)
 
-# --- Misinterpretation Note ---
+# --- Misinterpretation Warning ---
 st.markdown("""
 <details>
 <summary><strong>🧠 Understanding Bayesian False Positives</strong></summary>
@@ -110,8 +124,9 @@ Unlike frequentist tests, Bayesian A/B tests **do not control a fixed Type I err
   - Posterior decision threshold (e.g., 0.95)
 - It is **not guaranteed to stay below 5%**, even with a 95% posterior threshold.
 
-You should empirically test your error rate — like this app does — to understand and justify your Bayesian decision rules.
+This app helps you **empirically test** and justify your Bayesian rules.
 
 </details>
 """, unsafe_allow_html=True)
+
 
